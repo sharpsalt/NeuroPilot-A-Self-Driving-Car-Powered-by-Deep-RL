@@ -1,5 +1,6 @@
 import cv2
 import os
+import random
 import numpy as np
 
 # Base directory resolution (robust path handling)
@@ -18,8 +19,8 @@ with open(os.path.join(BASE_PATH,"data.txt")) as f:
         xs.append(os.path.join(BASE_PATH, img_file))
         #the paper by Nvidia uses the inveses of the turning radius,
         #but steering wheel angle is proportional to the inverse of turning radius
-        #so the steering wheel angle in radians is used as outputs
-        ys.append(float(angle_str) * np.pi / 180)
+        #so the steering wheel angle in radians is used as outputs(pi/180)
+        ys.append(float(angle_str) * np.pi /180)
 
 #get number of images
 num_images=len(xs)
@@ -44,8 +45,18 @@ def LoadTrainBatch(batch_size):
     x_out=[]
     y_out=[]
     for i in range(batch_size):
-        x_out.append(cv2.resize(cv2.imread(train_xs[(train_batch_pointer+i)%num_train_images])[-150:],(200,66))/255.0)
         y_out.append([train_ys[(train_batch_pointer+i)%num_train_images]])
+        image_path=train_xs[(train_batch_pointer+i)%num_train_images]
+        img=cv2.imread(image_path)
+    #    img=cv2.resize(img,(200,66))
+        if img is None:
+            print(f"Skkipping image {image_path} as it is missing")
+            continue #we will skip this image 
+        img=img[-150:] #crop the image(90 pixels from top)
+        img=cv2.resize(img,(200,66))/255.0
+        x_out.append(img)
+        y_out.append([train_ys[(train_batch_pointer+i)%num_train_images]])
+
     train_batch_pointer+=batch_size
     return x_out,y_out
 
