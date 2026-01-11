@@ -71,7 +71,7 @@ class Trainer:
 if __name__=="__main__":
     LOGDIR='model_training/train_steering_angle/save2'
     LOGS_PATH='model_training/train_steering_angle/log2'
-    EPOCHS=30
+    EPOCHS=50
     BATCH_SIZE=100
     logger=DataLogger(LOGS_PATH)
     trainer=Trainer(model,LOGDIR,logger)
