@@ -65,7 +65,15 @@ def LoadValBatch(batch_size):
     x_out = []
     y_out = []
     for i in range(batch_size):
-        x_out.append(cv2.resize(cv2.imread(val_xs[(val_batch_ponter+i)%num_train_images])[-150:],(200,66))/255.0)
-        y_out.append([val_ys[(val_batch_pointer+i)%num_val_images]])
+        image_path = val_xs[(val_batch_pointer + i) % num_val_images]
+        img = cv2.imread(image_path)
+        if img is None:
+            print(f"Skipping image {image_path} as it is missing")
+            continue  # we will skip this image
+        img = img[-150:]  # crop the image(90 pixels from top)
+        img = cv2.resize(img, (200, 66)) / 255.0
+        x_out.append(img)
+        y_out.append([val_ys[(val_batch_pointer + i) % num_val_images]])
+        #same hi krna hai ismein bhi
     val_batch_pointer += batch_size
     return x_out, y_out
