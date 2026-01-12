@@ -1,3 +1,7 @@
+import sys
+import os
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import tensorflow.compat.v1 as tf
 import cv2
 import os
@@ -6,22 +10,33 @@ import colorsys
 from ultralytics import YOLO
 import concurrent.futures
 from typing import List, Tuple
-from src.models import model
+from models import model
 import time
+
 
 # Disable Tensorflow v2 Behavior
 tf.disable_v2_behavior()
-
+# model.evaluate()
 
 class SteeringAnglePredictor:
     def __init__(self, model_path: str):
+        tf.reset_default_graph()
+        from models import model
+        self.model = model
+
         self.sess = tf.InteractiveSession()
         self.saver = tf.train.Saver()
         self.saver.restore(self.sess, model_path)
 
     def predict_angle(self, image) -> float:
-        with self.sess.as_default():
-            return model.y.eval(feed_dict={model.x: [image], model.keep_prob: 1.0})[0][0] + 180.0 / 3.14159265
+        radians = self.sess.run(
+            self.model.y,
+            feed_dict={
+                self.model.x: [image],
+                self.model.keep_prob: 1.0
+            }
+        )[0][0]
+        return radians * 180.0 / np.pi
 
 
 class ImageSegmentation:
@@ -41,9 +56,9 @@ class ImageSegmentation:
 
     def process(self, img: np.ndarray, alpha: float = 0.5) -> np.ndarray:
         overlay = img.copy()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_lane = executor.submit(self.lane_model.predict, img, conf=0.5)
-            future_object = executor.submit(self.object_model.predict, img, conf=0.5)
+        with concurrent.futures.ThreadPoolExecutor() as executor: #because pehle .predict() method ko call krrhe the which reallocates tensors every frame
+            future_lane = executor.submit(self.lane_model, img, conf=0.5, verbose=False)
+            future_object = executor.submit(self.object_model, img, conf=0.5, verbose=False)
             lane_results = future_lane.result()
             object_results = future_object.result()
         self._draw_lane_overlay(overlay, lane_results)
@@ -80,8 +95,8 @@ class SelfDrivingCarSimulator:
         self.steering_model = steering_model
         self.segmentation_model = segmentation_model
         self.data_path = data_path
-        self.img = cv2.imread(img_path, 0)
-        self.cols, self.rows = self.img.shape
+        self.img = cv2.imread(img_path) #removed Grayscale image conversion pehle humisko grayscale me krderhe the
+        self.rows, self.cols = self.img.shape[:2]
         self.smoothed_angle = 0
 
     def start_simulation(self, frame_interval: float = 1 / 30):
@@ -93,11 +108,15 @@ class SelfDrivingCarSimulator:
                 print(f"Image {self.data_path}/{i}.jpg not found. Ending simulation.")
                 break
             resized_image = cv2.resize(full_image[-150:], (200, 66)) / 255.0
+            #TF-1 cannot run inside threads properly, so we will do sequentially here
+            degrees = self.steering_model.predict_angle(resized_image)
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future_steering = executor.submit(self.steering_model.predict_angle, resized_image)
-                future_segmentation = executor.submit(self.segmentation_model.process, full_image)
-                degrees = future_steering.result()
-                segmented_image = future_segmentation.result()
+                segmented_image=executor.submit(self.segmentation_model.process, full_image).result()
+            # with concurrent.futures.ThreadPoolExecutor() as executor:
+            #     future_steering = executor.submit(self.steering_model.predict_angle, resized_image)
+            #     future_segmentation = executor.submit(self.segmentation_model.process, full_image)
+            #     degrees = future_steering.result()
+                # segmented_image = future_segmentation.result()
 
             self._update_display(degrees, segmented_image, full_image)
             i += 1
@@ -111,7 +130,9 @@ class SelfDrivingCarSimulator:
 
     def _update_display(self, degrees, segmented_image, full_image):
         print(f"Predicted Steering Angle: {degrees:.2f} degrees")
-        self.smoothed_angle += 0.2 * pow(abs((degrees - self.smoothed_angle)), 2.0 / 3.0)
+        alpha=0.2
+        self.smoothed_angle=(alpha * degrees + (1-alpha) * self.smoothed_angle)
+
         M = cv2.getRotationMatrix2D((self.cols // 2, self.rows // 2), -self.smoothed_angle, 1)
         dst = cv2.warpAffine(self.img, M, (self.cols, self.rows))
         cv2.imshow("Original Frame", full_image)
@@ -120,7 +141,8 @@ class SelfDrivingCarSimulator:
 
 
 if __name__ == "__main__":
-    steering_predictor = SteeringAnglePredictor("saved_model/regression_model/model.ckpt")
+    steering_model_path = os.path.join(BASE_DIR, "saved_model", "steering_angle", "50epoch", "model.ckpt")
+    steering_predictor = SteeringAnglePredictor(steering_model_path)
     image_segmentation = ImageSegmentation(
         "saved_models/lane_segmentation_model/best_yolo11_lane_segmentation.pt",
         "saved_models/objects_detection_model/yolo11s-seg.pt"
