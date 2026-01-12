@@ -21,7 +21,7 @@ class SteeringAnglePredictor:
         self.model=model
 
     def predict_angle(self,image):
-        radians=self.model.y.eval(feed_dict={self.model.x: [image],self.model.keep_prob: 1.0})[0][0]
+        # radians=self.model.y.eval(feed_dict={self.model.x: [image],self.model.keep_prob: 1.0})[0][0]
         radians = self.sess.run(model.y,feed_dict={model.x: [image], model.keep_prob: 1.0})[0][0]
         return radians * 180.0 / np.pi
 
