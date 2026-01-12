@@ -3,6 +3,7 @@ import os
 import cv2
 from ultralytics import YOLO
 
+
 def smooth_line(new_line, old_line, alpha=0.8):
     """
     Smooths lane line coordinates by blending the new detection with the previous one.
