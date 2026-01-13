@@ -42,7 +42,7 @@ class Trainer:
             print(f"Epoch {epoch+1}/{epochs} completed")
     
     def _train_one_epoch(self,epoch,batch_size):
-        for i in range(int(driving_data.num_images/batch_size)):
+       for i in range(int(driving_data.num_train_images/batch_size)):
             xs,ys=driving_data.LoadTrainBatch(batch_size)
             self.train_step.run(feed_dict={model.x:xs,model.y_:ys,model.keep_prob:0.8})
             if i%10==0:
