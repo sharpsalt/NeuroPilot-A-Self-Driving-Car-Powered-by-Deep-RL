@@ -44,21 +44,21 @@ def LoadTrainBatch(batch_size):
     global train_batch_pointer
     x_out=[]
     y_out=[]
+
     for i in range(batch_size):
-        y_out.append([train_ys[(train_batch_pointer+i)%num_train_images]])
-        image_path=train_xs[(train_batch_pointer+i)%num_train_images]
+        idx=(train_batch_pointer+i)%num_train_images
+        image_path=train_xs[idx]
         img=cv2.imread(image_path)
-    #    img=cv2.resize(img,(200,66))
         if img is None:
-            print(f"Skkipping image {image_path} as it is missing")
-            continue #we will skip this image 
-        img=img[-150:] #crop the image(90 pixels from top)
+            print(f"Skipping image {image_path} as it is missing")
+            continue
+        img=img[-150:]
         img=cv2.resize(img,(200,66))/255.0
         x_out.append(img)
-        y_out.append([train_ys[(train_batch_pointer+i)%num_train_images]])
-
+        y_out.append([train_ys[idx]])
     train_batch_pointer+=batch_size
-    return x_out,y_out
+    return x_out, y_out
+
 
 def LoadValBatch(batch_size):
     global val_batch_pointer
